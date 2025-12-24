@@ -2,12 +2,14 @@ import streamlit as st
 import pandas as pd
 import random
 import os
+import shutil
 from datetime import datetime
 
 # --- FILE & FOLDER SETUP ---
 CHAR_FILE = "characters.csv"
 PORTFOLIO_FILE = "portfolio.csv"
 TIMELINE_FILE = "timeline.csv"
+ROSTER_EXAMPLE_FILE = "roster_examples.csv" # <--- The file you just uploaded
 IMAGE_DIR = "character_images"
 PORTFOLIO_DIR = "portfolio_images"
 
@@ -37,8 +39,10 @@ def save_image(image_file, folder, alias):
         f.write(image_file.getbuffer())
     return path
 
-def save_character(name, alias, background, power, weakness, allies, enemies, costume, image_file):
-    image_path = save_image(image_file, IMAGE_DIR, alias)
+def save_character(name, alias, background, power, weakness, allies, enemies, costume, image_path):
+    # This function now accepts a path string directly (for the auto-loader)
+    # or creates one if we were uploading a new file.
+    
     df = load_data(CHAR_FILE, ["Name", "Alias", "Background", "Power", "Weakness", "Allies", "Enemies", "Costume", "Image_Path"])
     new_entry = pd.DataFrame([{
         "Name": name, "Alias": alias, "Background": background, 
@@ -67,6 +71,55 @@ def save_timeline_event(year, event, type):
     except:
         pass 
     df.to_csv(TIMELINE_FILE, index=False)
+
+# --- AUTO-LOADER LOGIC ---
+def initialize_roster():
+    # Only run if characters.csv is missing or empty
+    if not os.path.exists(CHAR_FILE) or os.stat(CHAR_FILE).st_size < 10: # < 10 bytes means basically empty
+        if os.path.exists(ROSTER_EXAMPLE_FILE):
+            try:
+                # Load the example file
+                ex_df = pd.read_csv(ROSTER_EXAMPLE_FILE)
+                
+                # Loop through and add them to the system
+                for index, row in ex_df.iterrows():
+                    # 1. Handle the Image
+                    img_filename = row['Uploaded Sketch']
+                    final_img_path = None
+                    
+                    if pd.notna(img_filename):
+                        # Check if it's already in the folder, or needs moving
+                        target_path = os.path.join(IMAGE_DIR, img_filename)
+                        source_path = img_filename # Assuming it's in the root
+                        
+                        if os.path.exists(target_path):
+                            final_img_path = target_path
+                        elif os.path.exists(source_path):
+                            shutil.move(source_path, target_path)
+                            final_img_path = target_path
+                    
+                    # 2. Format the Power Text
+                    power_text = str(row['Super Powers'])
+                    if pd.notna(row['Signature Move']):
+                        power_text += f"\n\n💥 Signature Move: {row['Signature Move']}"
+
+                    # 3. Save to Vault
+                    save_character(
+                        name=row['Real Name'],
+                        alias=row['Hero Name'],
+                        background=row['Role / Archetype'],
+                        power=power_text,
+                        weakness=row['Weaknesses'],
+                        allies="The Family",
+                        enemies="The Unknown",
+                        costume=row['Costume / Visuals'],
+                        image_path=final_img_path
+                    )
+                return True # Indicates we loaded data
+            except Exception as e:
+                print(f"Error loading roster: {e}")
+                return False
+    return False
 
 # --- CREATIVE GENERATORS ---
 def generate_plot(category):
@@ -131,9 +184,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SCRIPT HELPERS ---
+# --- INITIALIZATION ---
 if 'script_text' not in st.session_state:
     st.session_state['script_text'] = "TITLE: \nISSUE: \n\n[PAGE 1]\n"
+
+# Run the auto-loader once
+if 'roster_loaded' not in st.session_state:
+    if initialize_roster():
+        st.toast("🚀 Auto-loaded Example Roster!", icon="🦸")
+    st.session_state['roster_loaded'] = True
 
 def insert_text(text_to_add):
     st.session_state['script_text'] += f"\n\n{text_to_add}"
@@ -186,7 +245,6 @@ else:
     if mode == "🦸 Character Vault":
         st.title("The Universe Database 🦸‍♂️")
         
-        # We split the screen: Left for INPUT, Right for ROSTER (Grid View)
         col_input, col_roster = st.columns([1, 2])
         
         # --- LEFT COLUMN: CREATE ---
@@ -208,7 +266,12 @@ else:
                 
                 if st.button("Save to Vault", type="primary"):
                     if alias:
-                        save_character(name, alias, background, power, weakness, allies, enemies, costume, uploaded_file)
+                        # Process uploaded file
+                        img_path = None
+                        if uploaded_file:
+                            img_path = save_image(uploaded_file, IMAGE_DIR, alias)
+                        
+                        save_character(name, alias, background, power, weakness, allies, enemies, costume, img_path)
                         st.success(f"Saved {alias}!")
                         st.rerun()
         
@@ -218,18 +281,16 @@ else:
             df = load_data(CHAR_FILE, ["Alias", "Background", "Power", "Image_Path", "Weakness", "Allies", "Enemies"])
             
             if not df.empty:
-                # We reverse the list to show newest characters first
                 df = df.iloc[::-1].reset_index(drop=True)
                 
-                # Create a Grid: 2 Cards per row
                 for i in range(0, len(df), 2):
                     cols = st.columns(2)
                     for j in range(2):
                         if i + j < len(df):
                             row = df.iloc[i + j]
                             with cols[j]:
-                                # START CARD
                                 with st.container(border=True):
+                                    # Show Image
                                     if row['Image_Path'] and os.path.exists(row['Image_Path']):
                                         st.image(row['Image_Path'], use_container_width=True)
                                     
@@ -241,11 +302,9 @@ else:
                                     if row['Enemies']:
                                         st.caption(f"⚔️ **Enemies:** {row['Enemies']}")
                                         
-                                    # Use expander for long text to keep card neat
                                     if row['Background']:
                                         with st.expander("Read Origin"):
                                             st.write(row['Background'])
-                                # END CARD
             else:
                 st.info("Vault is empty. Add your first character on the left!")
 
@@ -294,7 +353,6 @@ else:
         b4.button("SFX 💥", on_click=insert_text, args=("(SFX: BOOM!)",))
         
         text_area = st.text_area("Write your script here...", height=500, key="script_text")
-        
         st.download_button("Download Script", text_area, file_name="comic_script.txt")
 
     # 4. PORTFOLIO

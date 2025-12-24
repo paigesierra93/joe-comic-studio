@@ -21,6 +21,7 @@ def load_data(file_path, columns):
     if not os.path.exists(file_path):
         return pd.DataFrame(columns=columns)
     df = pd.read_csv(file_path)
+    # Ensure all columns exist (adds new columns like 'Background' if missing)
     for col in columns:
         if col not in df.columns:
             df[col] = None
@@ -37,11 +38,14 @@ def save_image(image_file, folder, alias):
         f.write(image_file.getbuffer())
     return path
 
-def save_character(name, alias, power, weakness, allies, enemies, costume, image_file):
+# UPDATED: Added 'background' to save function
+def save_character(name, alias, background, power, weakness, allies, enemies, costume, image_file):
     image_path = save_image(image_file, IMAGE_DIR, alias)
-    df = load_data(CHAR_FILE, ["Name", "Alias", "Power", "Weakness", "Allies", "Enemies", "Costume", "Image_Path"])
+    # Load with new Background column
+    df = load_data(CHAR_FILE, ["Name", "Alias", "Background", "Power", "Weakness", "Allies", "Enemies", "Costume", "Image_Path"])
     new_entry = pd.DataFrame([{
-        "Name": name, "Alias": alias, "Power": power, "Weakness": weakness,
+        "Name": name, "Alias": alias, "Background": background, 
+        "Power": power, "Weakness": weakness,
         "Allies": allies, "Enemies": enemies, "Costume": costume, "Image_Path": image_path
     }])
     df = pd.concat([df, new_entry], ignore_index=True)
@@ -121,11 +125,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SCRIPT HELPERS (THE FIX) ---
+# --- SCRIPT HELPERS ---
 if 'script_text' not in st.session_state:
     st.session_state['script_text'] = "TITLE: \nISSUE: \n\n[PAGE 1]\n"
 
-# This function runs BEFORE the app redraws, ensuring the text is updated instantly
 def insert_text(text_to_add):
     st.session_state['script_text'] += f"\n\n{text_to_add}"
 
@@ -182,9 +185,18 @@ else:
             st.subheader("Create New Character")
             name = st.text_input("Real Name")
             alias = st.text_input("Hero/Villain Name")
+            
+            # UPDATED: Background Field
+            background = st.text_area("Origin Story / Background", height=150, help="How did they get their powers? Where are they from?")
+
+            # UPDATED: Power & Weakness larger
+            st.write("---")
             c1, c2 = st.columns(2)
-            with c1: power = st.text_input("Power")
-            with c2: weakness = st.text_input("Weakness")
+            with c1: 
+                power = st.text_area("Super Powers", height=100)
+            with c2: 
+                weakness = st.text_area("Weaknesses", height=100)
+            
             allies = st.text_input("Allies")
             enemies = st.text_input("Enemies")
             costume = st.text_area("Costume Description")
@@ -192,20 +204,27 @@ else:
             
             if st.button("Save to Vault", type="primary"):
                 if alias:
-                    save_character(name, alias, power, weakness, allies, enemies, costume, uploaded_file)
+                    save_character(name, alias, background, power, weakness, allies, enemies, costume, uploaded_file)
                     st.success(f"Saved {alias}!")
                     st.rerun()
         
         with col2:
             st.subheader("Roster")
-            df = load_data(CHAR_FILE, ["Alias", "Power", "Image_Path", "Weakness", "Allies", "Enemies"])
+            # UPDATED: Loading Background column
+            df = load_data(CHAR_FILE, ["Alias", "Background", "Power", "Image_Path", "Weakness", "Allies", "Enemies"])
             if not df.empty:
                 for index, row in df.iloc[::-1].iterrows():
                     with st.expander(f"**{row['Alias']}**"):
                         if row['Image_Path'] and os.path.exists(row['Image_Path']):
                             st.image(row['Image_Path'])
-                        st.write(f"**Power:** {row['Power']}")
-                        st.write(f"**Weakness:** {row['Weakness']}")
+                        
+                        # UPDATED: Displaying Background
+                        if row['Background']:
+                            st.write(f"**📜 Origin:** {row['Background']}")
+                            st.markdown("---")
+                            
+                        st.write(f"**⚡ Power:** {row['Power']}")
+                        st.write(f"**⚠️ Weakness:** {row['Weakness']}")
                         st.info(f"Allies: {row['Allies']}")
                         st.error(f"Enemies: {row['Enemies']}")
             else:
@@ -243,20 +262,18 @@ else:
             else:
                 st.info("No history recorded yet.")
 
-    # 3. SCRIPT WRITER (FIXED!)
+    # 3. SCRIPT WRITER
     elif mode == "📝 Script Writer":
         st.title("Script Editor 💬")
         
         st.write("Quick Insert:")
         b1, b2, b3, b4 = st.columns(4)
         
-        # Use on_click callbacks to ensure text injects properly
         b1.button("[PANEL]", on_click=insert_text, args=("[PANEL X]",))
         b2.button("CAPTION", on_click=insert_text, args=("CAPTION: ",))
         b3.button("DIALOGUE", on_click=insert_text, args=("CHARACTER: \"(Dialogue)\"",))
         b4.button("SFX 💥", on_click=insert_text, args=("(SFX: BOOM!)",))
         
-        # Connect text area directly to session state key
         text_area = st.text_area("Write your script here...", height=500, key="script_text")
         
         st.download_button("Download Script", text_area, file_name="comic_script.txt")

@@ -21,7 +21,6 @@ def load_data(file_path, columns):
     if not os.path.exists(file_path):
         return pd.DataFrame(columns=columns)
     df = pd.read_csv(file_path)
-    # Ensure all columns exist
     for col in columns:
         if col not in df.columns:
             df[col] = None
@@ -97,47 +96,38 @@ def get_daily_challenge():
 # --- PAGE CONFIG & STYLE ---
 st.set_page_config(page_title="Joe's Comic Studio", page_icon="🦇", layout="wide")
 
-# --- UPDATED FONTS: Bangers (Headings) + Comic Neue (Body) ---
 st.markdown("""
 <style>
-    /* Import BOTH fonts */
     @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@300;400;700&display=swap');
 
-    /* 1. Set Body Font to Comic Neue */
     .stApp, .stMarkdown, .stText, p, div, input, textarea, button {
         font-family: 'Comic Neue', cursive !important;
         font-weight: 400;
-        font-size: 18px; /* Slightly bigger for comic readabilty */
+        font-size: 18px;
     }
     
-    /* 2. Set Headings to Bangers */
     h1, h2, h3 { 
         font-family: 'Bangers', cursive !important; 
         color: #00adb5 !important; 
         letter-spacing: 2px;
-        text-shadow: 2px 2px #000; /* Comic book shadow effect */
+        text-shadow: 2px 2px #000;
     }
     
-    /* 3. Style the Intro Card */
     .intro-card {
         background-color: #262730; padding: 40px; border-radius: 15px;
         border: 4px solid #00adb5; text-align: center;
-        box-shadow: 5px 5px 0px #00adb5; /* Pop-art shadow */
-    }
-    
-    .challenge-box {
-        background-color: #222; border-left: 5px solid #ff4b4b;
-        padding: 15px; margin-bottom: 20px; font-style: italic;
+        box-shadow: 5px 5px 0px #00adb5;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SCRIPT HELPER FUNCTIONS ---
+# --- SCRIPT HELPERS (THE FIX) ---
 if 'script_text' not in st.session_state:
     st.session_state['script_text'] = "TITLE: \nISSUE: \n\n[PAGE 1]\n"
 
-def add_script_element(text):
-    st.session_state['script_text'] += f"\n\n{text}"
+# This function runs BEFORE the app redraws, ensuring the text is updated instantly
+def insert_text(text_to_add):
+    st.session_state['script_text'] += f"\n\n{text_to_add}"
 
 # ==========================================
 # PART 1: THE WELCOME SCREEN
@@ -168,10 +158,8 @@ if not st.session_state['intro_seen']:
 # PART 2: THE STUDIO
 # ==========================================
 else:
-    # --- SIDEBAR ---
     st.sidebar.title("🦇 Studio Tools")
     
-    # Daily Challenge
     st.sidebar.markdown("---")
     st.sidebar.markdown("**🔥 Daily Art Challenge**")
     st.sidebar.info(get_daily_challenge())
@@ -255,19 +243,22 @@ else:
             else:
                 st.info("No history recorded yet.")
 
-    # 3. SCRIPT WRITER
+    # 3. SCRIPT WRITER (FIXED!)
     elif mode == "📝 Script Writer":
         st.title("Script Editor 💬")
         
         st.write("Quick Insert:")
         b1, b2, b3, b4 = st.columns(4)
-        if b1.button("[PANEL]"): add_script_element("[PANEL X]")
-        if b2.button("CAPTION"): add_script_element("CAPTION: ")
-        if b3.button("DIALOGUE"): add_script_element("CHARACTER: \"(Dialogue)\"")
-        if b4.button("SFX 💥"): add_script_element("(SFX: BOOM!)")
         
-        text_area = st.text_area("Write your script here...", value=st.session_state['script_text'], height=500, key="editor")
-        st.session_state['script_text'] = text_area
+        # Use on_click callbacks to ensure text injects properly
+        b1.button("[PANEL]", on_click=insert_text, args=("[PANEL X]",))
+        b2.button("CAPTION", on_click=insert_text, args=("CAPTION: ",))
+        b3.button("DIALOGUE", on_click=insert_text, args=("CHARACTER: \"(Dialogue)\"",))
+        b4.button("SFX 💥", on_click=insert_text, args=("(SFX: BOOM!)",))
+        
+        # Connect text area directly to session state key
+        text_area = st.text_area("Write your script here...", height=500, key="script_text")
+        
         st.download_button("Download Script", text_area, file_name="comic_script.txt")
 
     # 4. PORTFOLIO

@@ -21,7 +21,6 @@ def load_data(file_path, columns):
     if not os.path.exists(file_path):
         return pd.DataFrame(columns=columns)
     df = pd.read_csv(file_path)
-    # Ensure all columns exist (adds new columns like 'Background' if missing)
     for col in columns:
         if col not in df.columns:
             df[col] = None
@@ -38,10 +37,8 @@ def save_image(image_file, folder, alias):
         f.write(image_file.getbuffer())
     return path
 
-# UPDATED: Added 'background' to save function
 def save_character(name, alias, background, power, weakness, allies, enemies, costume, image_file):
     image_path = save_image(image_file, IMAGE_DIR, alias)
-    # Load with new Background column
     df = load_data(CHAR_FILE, ["Name", "Alias", "Background", "Power", "Weakness", "Allies", "Enemies", "Costume", "Image_Path"])
     new_entry = pd.DataFrame([{
         "Name": name, "Alias": alias, "Background": background, 
@@ -122,6 +119,15 @@ st.markdown("""
         border: 4px solid #00adb5; text-align: center;
         box-shadow: 5px 5px 0px #00adb5;
     }
+    
+    /* Character Card Styling */
+    .char-card {
+        background-color: #1e1e1e;
+        border: 2px solid #333;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -179,56 +185,69 @@ else:
     # 1. CHARACTER VAULT
     if mode == "🦸 Character Vault":
         st.title("The Universe Database 🦸‍♂️")
-        col1, col2 = st.columns([1, 1])
         
-        with col1:
+        # We split the screen: Left for INPUT, Right for ROSTER (Grid View)
+        col_input, col_roster = st.columns([1, 2])
+        
+        # --- LEFT COLUMN: CREATE ---
+        with col_input:
             st.subheader("Create New Character")
-            name = st.text_input("Real Name")
-            alias = st.text_input("Hero/Villain Name")
-            
-            # UPDATED: Background Field
-            background = st.text_area("Origin Story / Background", height=150, help="How did they get their powers? Where are they from?")
-
-            # UPDATED: Power & Weakness larger
-            st.write("---")
-            c1, c2 = st.columns(2)
-            with c1: 
-                power = st.text_area("Super Powers", height=100)
-            with c2: 
-                weakness = st.text_area("Weaknesses", height=100)
-            
-            allies = st.text_input("Allies")
-            enemies = st.text_input("Enemies")
-            costume = st.text_area("Costume Description")
-            uploaded_file = st.file_uploader("Upload Sketch", type=['png', 'jpg'])
-            
-            if st.button("Save to Vault", type="primary"):
-                if alias:
-                    save_character(name, alias, background, power, weakness, allies, enemies, costume, uploaded_file)
-                    st.success(f"Saved {alias}!")
-                    st.rerun()
+            with st.container(border=True):
+                name = st.text_input("Real Name")
+                alias = st.text_input("Hero/Villain Name")
+                background = st.text_area("Origin Story / Background", height=100)
+                
+                c1, c2 = st.columns(2)
+                with c1: power = st.text_area("Super Powers", height=80)
+                with c2: weakness = st.text_area("Weaknesses", height=80)
+                
+                allies = st.text_input("Allies")
+                enemies = st.text_input("Enemies")
+                costume = st.text_area("Costume Visuals", height=80)
+                uploaded_file = st.file_uploader("Upload Sketch", type=['png', 'jpg'])
+                
+                if st.button("Save to Vault", type="primary"):
+                    if alias:
+                        save_character(name, alias, background, power, weakness, allies, enemies, costume, uploaded_file)
+                        st.success(f"Saved {alias}!")
+                        st.rerun()
         
-        with col2:
+        # --- RIGHT COLUMN: ROSTER (CARDS) ---
+        with col_roster:
             st.subheader("Roster")
-            # UPDATED: Loading Background column
             df = load_data(CHAR_FILE, ["Alias", "Background", "Power", "Image_Path", "Weakness", "Allies", "Enemies"])
+            
             if not df.empty:
-                for index, row in df.iloc[::-1].iterrows():
-                    with st.expander(f"**{row['Alias']}**"):
-                        if row['Image_Path'] and os.path.exists(row['Image_Path']):
-                            st.image(row['Image_Path'])
-                        
-                        # UPDATED: Displaying Background
-                        if row['Background']:
-                            st.write(f"**📜 Origin:** {row['Background']}")
-                            st.markdown("---")
-                            
-                        st.write(f"**⚡ Power:** {row['Power']}")
-                        st.write(f"**⚠️ Weakness:** {row['Weakness']}")
-                        st.info(f"Allies: {row['Allies']}")
-                        st.error(f"Enemies: {row['Enemies']}")
+                # We reverse the list to show newest characters first
+                df = df.iloc[::-1].reset_index(drop=True)
+                
+                # Create a Grid: 2 Cards per row
+                for i in range(0, len(df), 2):
+                    cols = st.columns(2)
+                    for j in range(2):
+                        if i + j < len(df):
+                            row = df.iloc[i + j]
+                            with cols[j]:
+                                # START CARD
+                                with st.container(border=True):
+                                    if row['Image_Path'] and os.path.exists(row['Image_Path']):
+                                        st.image(row['Image_Path'], use_container_width=True)
+                                    
+                                    st.markdown(f"### {row['Alias']}")
+                                    st.markdown(f"**⚡ Power:** {row['Power']}")
+                                    
+                                    if row['Allies']:
+                                        st.caption(f"🤝 **Allies:** {row['Allies']}")
+                                    if row['Enemies']:
+                                        st.caption(f"⚔️ **Enemies:** {row['Enemies']}")
+                                        
+                                    # Use expander for long text to keep card neat
+                                    if row['Background']:
+                                        with st.expander("Read Origin"):
+                                            st.write(row['Background'])
+                                # END CARD
             else:
-                st.info("Vault is empty.")
+                st.info("Vault is empty. Add your first character on the left!")
 
     # 2. UNIVERSE TIMELINE
     elif mode == "⏳ Universe Timeline":

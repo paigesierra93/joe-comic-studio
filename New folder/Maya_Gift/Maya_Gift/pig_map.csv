@@ -1,0 +1,8 @@
+Threshold,Image_File
+0,pig_empty.png
+10,pig_10.png
+30,pig_30.png
+50,pig_half.png
+70,pig_70.png
+90,pig_almost.png
+100,pig_full.png

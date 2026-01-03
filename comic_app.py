@@ -724,18 +724,16 @@ else:
 
                     # --- CLOUD IMAGE FIX START ---
                     import os
-                    # 1. Get the simple filename (e.g. "MEGAWATT.png") from the old long path
+                    # 1. Get the simple filename (e.g. "MEGAWATT.png")
                     filename = os.path.basename(str(row['Image_Path']))
                     
-                    # 2. Build the Cloud Path (looking in the folder next to the app)
+                    # 2. Build the Cloud Path
                     cloud_path = f"character_images/{filename}"
 
-                    # 3. DEBUG: This prints the path so you can check it! (Remove later if you want)
-                    # st.write(f"🕵️ Looking for: {cloud_path}") 
-
-                    # 4. Check if the file exists on the Cloud
+                    # 3. Check if the file exists on the Cloud
                     if os.path.exists(cloud_path):
-                        st.image(cloud_path, width="stretch") # removed width="stretch" if it causes error, use use_column_width=True
+                        # FIXED: "stretch" crashes Streamlit. We use use_column_width=True instead.
+                        st.image(cloud_path, use_column_width=True) 
                     else:
                         st.markdown(f"<div style='height:150px; background-color: white; border: 2px dashed black; display:flex; align-items:center; justify-content:center; color:red;'>Missing: {filename}</div>", unsafe_allow_html=True)
                     # --- CLOUD IMAGE FIX END ---
@@ -763,7 +761,8 @@ else:
                     if st.button(f"Delete {row['Hero Name']}", key=f"del_{index}"):
                         delete_character(selected_univ_view, row['Hero Name'])
                         st.rerun()
-                    else: st.info("No heroes found.")
+                    else: 
+                        st.info("No heroes found.")
 
     elif mode == "⏳ Timeline":
         st.title("⏳ Universe History")

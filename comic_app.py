@@ -504,7 +504,52 @@ if mode == "🦸 Character Dashboard":
         st.stop()
         
     view_file = st.selectbox("Select Universe:", universe_files, index=0)
+# ==========================================
+    # ➕ PASTE THIS: CREATE / EDIT FORM
+    # ==========================================
+    with st.expander("📝 Create / Edit Character", expanded=True):
+        c1, c2 = st.columns([1, 2])
+        
+        with c1:
+            st.markdown("#### 🆔 Identity")
+            # These keys (edit_...) allow the Edit Pencil to work!
+            st.text_input("Hero Name", key="edit_Hero Name")
+            st.text_input("Real Name", key="edit_Real Name")
+            st.selectbox("Role", ["Hero", "Villain", "Sidekick", "Anti-Hero", "Civilian"], key="edit_Role")
+            
+        with c2:
+            st.markdown("#### ⚡ Powers & Lore")
+            t1, t2 = st.tabs(["Powers", "Lore"])
+            with t1:
+                st.text_area("Super Powers", key="edit_Power")
+                st.text_input("Weakness", key="edit_Weakness")
+            with t2:
+                st.text_area("Origin Story", key="edit_Origin")
+                st.text_area("Relationships (for AI Chat)", key="edit_Relationships", help="Example: Batman (Mentor), Joker (Enemy)")
+
+        st.markdown("#### 📸 Costume")
+        uploaded_char_img = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'])
+        
+        if st.button("💾 SAVE CHARACTER", type="primary", use_container_width=True):
+            if st.session_state.get("edit_Hero Name"):
+                # 1. Collect Data
+                new_char_data = {}
+                # We loop through your columns to grab everything safely
+                for col in FULL_CHAR_COLUMNS:
+                    k = f"edit_{col}"
+                    if k in st.session_state:
+                        new_char_data[col] = st.session_state[k]
+                
+                # 2. Save
+                save_character(view_file, new_char_data, uploaded_char_img)
+                st.success(f"{new_char_data['Hero Name']} Saved!")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("❌ Error: You must enter a Hero Name!")
     
+    st.divider()
+    # ==========================================    
     # Load Data
     df = load_data(view_file, FULL_CHAR_COLUMNS)
 

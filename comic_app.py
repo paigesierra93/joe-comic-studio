@@ -276,16 +276,46 @@ def delete_character(universe, alias):
     df.to_csv(target_file, index=False)
     return True
 
-def save_character(data_dict):
-    universe = data_dict['Universe']
-    target_file = get_universe_filename(universe)
-    df = load_data(target_file, FULL_CHAR_COLUMNS)
-    if not df.empty:
-        df = df[df['Hero Name'] != data_dict['Hero Name']]
-    new_entry = pd.DataFrame([data_dict])
-    df = pd.concat([df, new_entry], ignore_index=True)
-    df.to_csv(target_file, index=False)
-    return target_file
+# ==========================================
+# 🛠️ HELPER FUNCTION: SAVE CHARACTER (3-ARGUMENT VERSION)
+# ==========================================
+def save_character(filename, data_dict, uploaded_image):
+    import pandas as pd
+    import os
+
+    # 1. Load the current Excel file
+    if os.path.exists(filename):
+        df = pd.read_excel(filename)
+    else:
+        # If file is missing, start a new one
+        # We assume FULL_CHAR_COLUMNS is defined globally
+        df = pd.DataFrame(columns=FULL_CHAR_COLUMNS)
+
+    # 2. Handle the Image Upload
+    if uploaded_image is not None:
+        # Make sure the folder exists
+        if not os.path.exists("character_images"):
+            os.makedirs("character_images")
+        
+        # Clean the filename and save it
+        clean_name = os.path.basename(uploaded_image.name)
+        img_path = f"character_images/{clean_name}"
+        
+        with open(img_path, "wb") as f:
+            f.write(uploaded_image.getbuffer())
+        
+        # Update the data dictionary with the new path
+        data_dict['Image_Path'] = img_path
+    else:
+        # If no image uploaded, keep it empty
+        data_dict['Image_Path'] = None
+
+    # 3. Add the New Hero to the List
+    new_row = pd.DataFrame([data_dict])
+    df = pd.concat([df, new_row], ignore_index=True)
+    
+    # 4. Save the updated list back to Excel
+    df.to_excel(filename, index=False)
 
 def save_timeline_event(year, event, type):
     df = load_data(TIMELINE_FILE, ["Year", "Event", "Type"])

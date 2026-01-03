@@ -398,24 +398,55 @@ if 'roster_loaded' not in st.session_state:
     if os.path.exists("comic_story1.png"):
         save_portfolio_entry("Example Comic", "1", "An automated example of the comic studio portfolio.", local_path="comic_story1.png")
     st.session_state['roster_loaded'] = True
-
+# ==========================================
+# 6. SIDEBAR
+# ==========================================
 # ==========================================
 # 6. SIDEBAR
 # ==========================================
 st.sidebar.title("🔑 Security Check")
+
+# --- 1. SAVE SYSTEM (MOVED TO TOP) ---
+# Putting this FIRST ensures it is always visible!
+st.sidebar.divider()
+st.sidebar.header("💾 Save Your Work")
+
+# Upload a Save File (Resume Game)
+uploaded_file = st.sidebar.file_uploader("Upload 'roster_complete.xlsx' to resume:", type=['xlsx'])
+if uploaded_file:
+    import pandas as pd
+    df = pd.read_excel(uploaded_file)
+    df.to_excel('roster_complete.xlsx', index=False)
+    st.sidebar.success("✅ Game Loaded!")
+
+# Download Current Work (Save Game)
+import os
+if os.path.exists("roster_complete.xlsx"):
+    with open("roster_complete.xlsx", "rb") as file:
+        st.sidebar.download_button(
+            label="⬇️ Download Save File",
+            data=file,
+            file_name="My_Comic_Roster.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+st.sidebar.divider()
+
+# --- 2. API KEY INPUT ---
 api_key_input = st.sidebar.text_input("Paste Google API Key here:", type="password")
 
 if not api_key_input:
     st.warning("👈 Please paste your Google API Key in the sidebar to start!")
     st.stop() 
 
+# --- 3. CONFIGURE AI ---
 try:
     genai.configure(api_key=api_key_input)
 except Exception as e:
     st.error(f"API Key Error: {e}")
     st.stop()
 
-# --- POWER LEVEL ---
+# --- 4. POWER LEVEL ---
+# (Make sure 'get_time_remaining' and 'SESSION_LIMIT_SECONDS' are defined above this in your code!)
 remaining = get_time_remaining()
 progress = remaining / SESSION_LIMIT_SECONDS
 st.sidebar.markdown("---")
@@ -683,42 +714,56 @@ else:
                 view_file = [k for k, v in universe_map.items() if v == selected_univ_view][0]
                 df = load_data(view_file, FULL_CHAR_COLUMNS)
                 
-                if not df.empty:
-                    cols = st.columns(2)
-                    for index, row in df.iterrows():
-                        with cols[index % 2]:
-                            st.markdown(f"""
-                            <div style="background-image: url('data:image/jpg;base64,{banner_char_bg}'); background-size: cover; padding: 10px; border: 3px solid black; border-radius: 5px; margin-bottom: 15px; box-shadow: 5px 5px 0px rgba(0,0,0,0.5);">
-                            """, unsafe_allow_html=True)
-                            if row['Image_Path'] and os.path.exists(str(row['Image_Path'])):
-                                st.image(str(row['Image_Path']), width="stretch")
-                            else:
-                                st.markdown("<div style='height:150px; background-color: white; border: 2px dashed black; display:flex; align-items:center; justify-content:center;'>No Image</div>", unsafe_allow_html=True)
-                            
-                            st.markdown(f"""
-                                <div style="background-color: #FFFF00; padding: 10px; border: 2px solid black; margin-top: 10px;">
-                                    <h3 style="margin:0; color: black !important; text-shadow: none; font-size: 24px;">{row['Hero Name']}</h3>
-                                    <p style="margin:0; font-size:16px; color:black; font-weight: bold;">{row['Role']}</p>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            with st.expander("📂 View Full Dossier"):
-                                for col in FULL_CHAR_COLUMNS:
-                                    if col != "Image_Path" and row[col]:
-                                        st.write(f"**{col}:** {row[col]}")
-                            
-                            # --- EDIT CALLBACK ---
-                            def load_edit(r):
-                                for col in FULL_CHAR_COLUMNS:
-                                    st.session_state[f"edit_{col}"] = r[col]
-                            
-                            st.button(f"✏️ Edit {row['Hero Name']}", key=f"edit_{index}", on_click=load_edit, args=(row,))
+            if not df.empty:
+                cols = st.columns(2)
+            for index, row in df.iterrows():
+                with cols[index % 2]:
+                    st.markdown(f"""
+                    <div style="background-image: url('data:image/jpg;base64,{banner_char_bg}'); background-size: cover; padding: 10px; border: 3px solid black; border-radius: 5px; margin-bottom: 15px; box-shadow: 5px 5px 0px rgba(0,0,0,0.5);">
+                    """, unsafe_allow_html=True)
 
-                            if st.button(f"Delete {row['Hero Name']}", key=f"del_{index}"):
-                                delete_character(selected_univ_view, row['Hero Name'])
-                                st.rerun()
-                else: st.info("No heroes found.")
+                    # --- CLOUD IMAGE FIX START ---
+                    import os
+                    # 1. Get the simple filename (e.g. "MEGAWATT.png") from the old long path
+                    filename = os.path.basename(str(row['Image_Path']))
+                    
+                    # 2. Build the Cloud Path (looking in the folder next to the app)
+                    cloud_path = f"character_images/{filename}"
+
+                    # 3. DEBUG: This prints the path so you can check it! (Remove later if you want)
+                    # st.write(f"🕵️ Looking for: {cloud_path}") 
+
+                    # 4. Check if the file exists on the Cloud
+                    if os.path.exists(cloud_path):
+                        st.image(cloud_path, width="stretch") # removed width="stretch" if it causes error, use use_column_width=True
+                    else:
+                        st.markdown(f"<div style='height:150px; background-color: white; border: 2px dashed black; display:flex; align-items:center; justify-content:center; color:red;'>Missing: {filename}</div>", unsafe_allow_html=True)
+                    # --- CLOUD IMAGE FIX END ---
+                    
+                    st.markdown(f"""
+                        <div style="background-color: #FFFF00; padding: 10px; border: 2px solid black; margin-top: 10px;">
+                            <h3 style="margin:0; color: black !important; text-shadow: none; font-size: 24px;">{row['Hero Name']}</h3>
+                            <p style="margin:0; font-size:16px; color:black; font-weight: bold;">{row['Role']}</p>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    with st.expander("📂 View Full Dossier"):
+                        for col in FULL_CHAR_COLUMNS:
+                            if col != "Image_Path" and row[col]:
+                                st.write(f"**{col}:** {row[col]}")
+                    
+                    # --- EDIT CALLBACK ---
+                    def load_edit(r):
+                        for col in FULL_CHAR_COLUMNS:
+                            st.session_state[f"edit_{col}"] = r[col]
+                    
+                    st.button(f"✏️ Edit {row['Hero Name']}", key=f"edit_{index}", on_click=load_edit, args=(row,))
+
+                    if st.button(f"Delete {row['Hero Name']}", key=f"del_{index}"):
+                        delete_character(selected_univ_view, row['Hero Name'])
+                        st.rerun()
+                    else: st.info("No heroes found.")
 
     elif mode == "⏳ Timeline":
         st.title("⏳ Universe History")

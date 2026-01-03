@@ -12,6 +12,48 @@ import csv
 from datetime import datetime
 import google.generativeai as genai
 
+# ==========================================
+# 🛠️ HELPER FUNCTION: SAVE CHARACTER
+# ==========================================
+def save_character(filename, data_dict, uploaded_image):
+    import pandas as pd
+    import os
+
+    # 1. Load the current Excel file
+    if os.path.exists(filename):
+        df = pd.read_excel(filename)
+    else:
+        # If file is missing, start a new one
+        # (We assume FULL_CHAR_COLUMNS is defined in your settings above)
+        df = pd.DataFrame(columns=FULL_CHAR_COLUMNS)
+
+    # 2. Handle the Image Upload
+    if uploaded_image is not None:
+        # Make sure the folder exists on the Cloud
+        if not os.path.exists("character_images"):
+            os.makedirs("character_images")
+        
+        # Save the image file
+        # We clean the name to avoid errors
+        clean_name = os.path.basename(uploaded_image.name)
+        img_path = f"character_images/{clean_name}"
+        
+        with open(img_path, "wb") as f:
+            f.write(uploaded_image.getbuffer())
+        
+        # Save this path to the data dictionary
+        data_dict['Image_Path'] = img_path
+    else:
+        # If no image uploaded, mark as None
+        data_dict['Image_Path'] = None
+
+    # 3. Add the New Hero to the List
+    new_row = pd.DataFrame([data_dict])
+    df = pd.concat([df, new_row], ignore_index=True)
+    
+    # 4. Save the updated list back to Excel
+    df.to_excel(filename, index=False)
+
 # --- SUPPRESS WARNINGS ---
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
